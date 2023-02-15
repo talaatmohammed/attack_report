@@ -1,0 +1,35 @@
+import csv
+import datetime
+from geoip import geolite2
+
+LOG_FILE = 'syslog.log'
+REPORT_FILE = 'attacker_report.csv'
+MIN_ATTEMPTS = 10
+DATE_FORMAT = '%Y-%m-%d'
+HEADER = ['IP Address', 'Attempts', 'Country', 'Date']
+
+def get_failed_login_attempts(logfile):
+    """Get a dictionary of failed login attempts from a log file."""
+    attempts = {}
+    for line in logfile:
+        if 'Failed password for' in line:
+            ip_address = line.split('from')[1].split()[0]
+            if ip_address in attempts:
+                attempts[ip_address] += 1
+            else:
+                attempts[ip_address] = 1
+    return attempts
+
+# Read the system log file and generate the report
+with open(LOG_FILE, 'r') as logfile, open(REPORT_FILE, 'w') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(HEADER)
+    now = datetime.datetime.now()
+    for ip_address, count in get_failed_login_attempts(logfile).items():
+        try:
+            country = geolite2.lookup(ip_address).country
+        except:
+            country = 'Unknown'
+        if count >= MIN_ATTEMPTS:
+            row = [ip_address, count, country, now.strftime(DATE_FORMAT)]
+            writer.writerow(row)
